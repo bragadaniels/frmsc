@@ -54,7 +54,7 @@
             cursor: pointer;
         }
 
-        /* Cartão de Áudio */
+        /* Cartão de Áudio (Estilo Spotify) */
         .audio-card {
             background: var(--card);
             padding: 24px 16px;
@@ -108,7 +108,7 @@
             background: var(--accent);
         }
 
-        /* Vídeo oculto */
+        /* O vídeo do YouTube fica oculto */
         #hidden-player {
             position: absolute;
             width: 1px;
@@ -124,7 +124,7 @@
             background: var(--card);
             border-radius: 16px;
             padding: 8px;
-            max-height: 400px;
+            max-height: 380px;
             overflow-y: auto;
         }
 
@@ -133,10 +133,10 @@
             border-bottom: 1px solid #242424;
             cursor: pointer;
             border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
             font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .track-item:hover {
@@ -174,6 +174,7 @@
     <div class="playlist-container" id="playlistContainer"></div>
 </div>
 
+<!-- Player do YouTube invisível para tocar só o áudio -->
 <div id="hidden-player"></div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
@@ -182,7 +183,7 @@
     let player;
     let isShuffle = false;
     let isPlaying = false;
-    let titulosCache = {};
+    let listaVideos = [];
 
     function onYouTubeIframeAPIReady() {
         player = new YT.Player('hidden-player', {
@@ -194,7 +195,7 @@
             },
             events: {
                 'onReady': () => {
-                    document.getElementById('statusText').innerText = "Pronto para carregar";
+                    document.getElementById('statusText').innerText = "Pronto para tocar";
                 },
                 'onStateChange': onPlayerStateChange
             }
@@ -206,7 +207,7 @@
         return match ? match[1] : urlOuId.trim();
     }
 
-    async function carregarPlaylist() {
+    function carregarPlaylist() {
         const val = document.getElementById('playlistInput').value;
         const playlistId = extrairPlaylistId(val);
 
@@ -215,112 +216,32 @@
             return;
         }
 
-        document.getElementById('statusText').innerText = "Carregando músicas...";
-
-        // 1. Inicia a playlist no player oculto
         player.loadPlaylist({
             listType: 'playlist',
             list: playlistId,
             index: 0
         });
 
-        // 2. Busca os nomes reais de todas as faixas
-        buscarNomesPlaylist(playlistId);
-    }
-
-    // Busca os nomes de uma vez via instâncias de API
-    async function buscarNomesPlaylist(playlistId) {
-        const container = document.getElementById('playlistContainer');
-        container.innerHTML = '<div style="padding:15px; color:#888;">Identificando músicas...</div>';
-
-        let titulosEncontrados = false;
-        const instancias = [
-            "https://invidious.nerdvpn.de",
-            "https://invidious.tiekoetter.com",
-            "https://yt.chocolatemoo53.com"
-        ];
-
-        for (const inst of instancias) {
-            try {
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 3000);
-                const res = await fetch(`${inst}/api/v1/playlists/${playlistId}`, { signal: controller.signal });
-                clearTimeout(timeout);
-
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.videos && data.videos.length > 0) {
-                        data.videos.forEach((v, idx) => {
-                            titulosCache[idx] = v.title;
-                        });
-                        titulosEncontrados = true;
-                        break;
-                    }
-                }
-            } catch (e) {}
-        }
-
-        // Renderiza a lista com os nomes
-        setTimeout(() => {
-            montarListaVisual();
-            // Se a API não respondeu tudo, busca o restante via Noembed
-            if (!titulosEncontrados) {
-                buscarTitulosFallback();
-            }
-        }, 1500);
-    }
-
-    function montarListaVisual() {
-        const container = document.getElementById('playlistContainer');
-        container.innerHTML = '';
-
-        const videoIds = player.getPlaylist();
-        if (!videoIds || videoIds.length === 0) return;
-
-        videoIds.forEach((id, index) => {
-            const div = document.createElement('div');
-            div.className = 'track-item';
-            div.id = `item-${index}`;
-
-            const nome = titulosCache[index] || `Música ${index + 1}...`;
-            div.innerText = `${index + 1}. ${nome}`;
-            div.onclick = () => tocarIndice(index);
-            container.appendChild(div);
-        });
-
-        atualizarInfoMusica();
-    }
-
-    // Fallback: se a API rápida falhar, puxa o nome individual pelo Noembed
-    function buscarTitulosFallback() {
-        const videoIds = player.getPlaylist() || [];
-        videoIds.forEach((id, index) => {
-            if (titulosCache[index]) return;
-
-            fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${id}`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.title) {
-                        titulosCache[index] = data.title;
-                        const el = document.getElementById(`item-${index}`);
-                        if (el) el.innerText = `${index + 1}. ${data.title}`;
-                    }
-                })
-                .catch(() => {});
-        });
+        document.getElementById('statusText').innerText = "Carregando músicas...";
+        setTimeout(atualizarListaVisual, 1800);
     }
 
     function onPlayerStateChange(event) {
         const playBtn = document.getElementById('btnPlayPause');
 
+        // Tocando
         if (event.data === YT.PlayerState.PLAYING) {
             isPlaying = true;
             playBtn.innerText = "⏸";
             atualizarInfoMusica();
-        } else if (event.data === YT.PlayerState.PAUSED) {
+        } 
+        // Pausado
+        else if (event.data === YT.PlayerState.PAUSED) {
             isPlaying = false;
             playBtn.innerText = "▶";
-        } else if (event.data === YT.PlayerState.ENDED) {
+        }
+        // Terminou a música -> O próprio YouTube já passa para a próxima sozinho!
+        else if (event.data === YT.PlayerState.ENDED) {
             atualizarInfoMusica();
         }
     }
@@ -358,21 +279,38 @@
         }
     }
 
+    function atualizarListaVisual() {
+        const container = document.getElementById('playlistContainer');
+        container.innerHTML = '';
+
+        const videoIds = player.getPlaylist();
+        if (!videoIds || videoIds.length === 0) return;
+
+        videoIds.forEach((id, index) => {
+            const div = document.createElement('div');
+            div.className = 'track-item';
+            div.id = `item-${index}`;
+            div.innerText = `Faixa ${index + 1}`;
+            div.onclick = () => tocarIndice(index);
+            container.appendChild(div);
+        });
+
+        atualizarInfoMusica();
+    }
+
     function atualizarInfoMusica() {
         if (!player || !player.getPlaylistIndex) return;
         const idx = player.getPlaylistIndex();
         const total = player.getPlaylist() ? player.getPlaylist().length : 0;
 
         const data = player.getVideoData();
-        let tituloAtual = (data && data.title) ? data.title : titulosCache[idx];
-
-        if (tituloAtual) {
-            document.getElementById('currentTitle').innerText = tituloAtual;
-            const el = document.getElementById(`item-${idx}`);
-            if (el) el.innerText = `${idx + 1}. ${tituloAtual}`;
+        if (data && data.title) {
+            document.getElementById('currentTitle').innerText = data.title;
+        } else {
+            document.getElementById('currentTitle').innerText = `Faixa ${idx + 1}`;
         }
 
-        document.getElementById('statusText').innerText = `Tocando ${idx + 1} de ${total}`;
+        document.getElementById('statusText').innerText = `Música ${idx + 1} de ${total}`;
 
         document.querySelectorAll('.track-item').forEach(el => el.classList.remove('playing'));
         const ativo = document.getElementById(`item-${idx}`);
