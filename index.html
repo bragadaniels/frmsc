@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Player de Playlist Sem Anúncios</title>
+    <title>Tocador de Áudio</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --card-color: #1e1e1e;
-            --text-color: #ffffff;
-            --accent-color: #1db954;
-            --hover-color: #2a2a2a;
+            --bg: #121212;
+            --card: #181818;
+            --accent: #1db954;
+            --text-dim: #b3b3b3;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            background-color: var(--bg);
+            color: #fff;
             margin: 0;
             padding: 16px;
             display: flex;
@@ -26,13 +25,13 @@
 
         .container {
             width: 100%;
-            max-width: 500px;
+            max-width: 480px;
         }
 
         .input-group {
             display: flex;
             gap: 8px;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
 
         input {
@@ -40,101 +39,114 @@
             padding: 12px;
             border-radius: 8px;
             border: 1px solid #333;
-            background: var(--card-color);
+            background: var(--card);
             color: #fff;
             font-size: 14px;
         }
 
         button {
-            padding: 10px 16px;
+            padding: 12px 18px;
             border-radius: 8px;
             border: none;
-            background: var(--accent-color);
+            background: var(--accent);
             color: #fff;
             font-weight: bold;
             cursor: pointer;
         }
 
-        button:active {
-            opacity: 0.8;
-        }
-
-        /* Player */
-        .player-card {
-            background: var(--card-color);
-            padding: 16px;
-            border-radius: 12px;
+        /* Cartão de Áudio (Estilo Spotify) */
+        .audio-card {
+            background: var(--card);
+            padding: 24px 16px;
+            border-radius: 16px;
             text-align: center;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
         }
 
-        iframe {
-            width: 100%;
-            height: 260px;
-            border-radius: 8px;
-            border: none;
-            background: #000;
+        .music-icon {
+            font-size: 48px;
+            margin-bottom: 8px;
         }
 
         .track-title {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
-            margin: 12px 0;
+            margin: 8px 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
+        .status {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 16px;
+        }
+
         .controls {
             display: flex;
             justify-content: center;
+            align-items: center;
             gap: 12px;
-            margin-top: 10px;
         }
 
         .btn-ctrl {
-            background: #333;
-            font-size: 14px;
+            background: #282828;
+            font-size: 16px;
+            padding: 10px 14px;
+            border-radius: 50px;
+        }
+
+        .btn-play {
+            background: var(--accent);
+            font-size: 20px;
+            padding: 14px 20px;
         }
 
         .btn-ctrl.active {
-            background: var(--accent-color);
+            background: var(--accent);
         }
 
-        /* Lista */
+        /* O vídeo do YouTube fica oculto */
+        #hidden-player {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+            top: -9999px;
+            left: -9999px;
+        }
+
+        /* Lista de Músicas */
         .playlist-container {
-            background: var(--card-color);
-            border-radius: 12px;
+            background: var(--card);
+            border-radius: 16px;
             padding: 8px;
             max-height: 380px;
             overflow-y: auto;
         }
 
         .track-item {
-            padding: 12px;
-            border-bottom: 1px solid #282828;
+            padding: 14px;
+            border-bottom: 1px solid #242424;
             cursor: pointer;
-            border-radius: 6px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             font-size: 14px;
         }
 
         .track-item:hover {
-            background-color: var(--hover-color);
+            background-color: #282828;
         }
 
         .track-item.playing {
-            color: var(--accent-color);
+            color: var(--accent);
             font-weight: bold;
             background-color: #1a2e20;
-        }
-
-        .status {
-            font-size: 12px;
-            color: #aaa;
-            margin-top: 8px;
         }
     </style>
 </head>
@@ -142,175 +154,166 @@
 
 <div class="container">
     <div class="input-group">
-        <input type="text" id="playlistInput" placeholder="Link ou ID da Playlist do YouTube">
-        <button onclick="carregarPlaylist()">Abrir</button>
+        <input type="text" id="playlistInput" placeholder="Link da Playlist do YouTube">
+        <button onclick="carregarPlaylist()">Carregar</button>
     </div>
 
-    <div class="player-card">
-        <!-- Iframe do Invidious: sem anúncios e sem bloqueio 403 -->
-        <iframe id="mediaPlayer" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-        <div class="track-title" id="currentTitle">Nenhuma música carregada</div>
+    <div class="audio-card">
+        <div class="music-icon">🎵</div>
+        <div class="track-title" id="currentTitle">Nenhuma música tocando</div>
+        <div class="status" id="statusText">Cole a playlist acima</div>
 
         <div class="controls">
-            <button class="btn-ctrl" onclick="anteriorMusica()">⏮ Voltar</button>
-            <button class="btn-ctrl" onclick="proximaMusica()">Pular ⏭</button>
-            <button class="btn-ctrl" id="btnShuffle" onclick="toggleShuffle()">🔀 Aleatório: OFF</button>
+            <button class="btn-ctrl" onclick="voltar()">⏮</button>
+            <button class="btn-ctrl btn-play" id="btnPlayPause" onclick="togglePlayPause()">▶</button>
+            <button class="btn-ctrl" onclick="pular()">⏭</button>
+            <button class="btn-ctrl" id="btnShuffle" onclick="alternarShuffle()">🔀</button>
         </div>
-        <div class="status" id="statusText">Cole a playlist e clique em Abrir</div>
     </div>
 
-    <div class="playlist-container" id="playlistContainer">
-        <!-- Itens da playlist aparecerão aqui -->
-    </div>
+    <div class="playlist-container" id="playlistContainer"></div>
 </div>
 
+<!-- Player do YouTube invisível para tocar só o áudio -->
+<div id="hidden-player"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+
 <script>
-    // Lista de instâncias públicas estáveis
-    const INSTANCIAS = [
-        "https://inv.nadeko.net",
-        "https://invidious.nerdvpn.de",
-        "https://invidious.jing.rocks"
-    ];
-    let instanciaAtual = INSTANCIAS[0];
-
-    let playlistOriginal = [];
-    let ordemReproducao = [];
-    let ponteiro = 0;
+    let player;
     let isShuffle = false;
-    let timerAutoSkip = null;
+    let isPlaying = false;
+    let listaVideos = [];
 
-    const player = document.getElementById('mediaPlayer');
-    const titleEl = document.getElementById('currentTitle');
-    const statusEl = document.getElementById('statusText');
-    const container = document.getElementById('playlistContainer');
-    const btnShuffle = document.getElementById('btnShuffle');
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('hidden-player', {
+            height: '1',
+            width: '1',
+            playerVars: {
+                'playsinline': 1,
+                'controls': 0
+            },
+            events: {
+                'onReady': () => {
+                    document.getElementById('statusText').innerText = "Pronto para tocar";
+                },
+                'onStateChange': onPlayerStateChange
+            }
+        });
+    }
 
     function extrairPlaylistId(urlOuId) {
         const match = urlOuId.match(/[?&]list=([^#&?]+)/);
         return match ? match[1] : urlOuId.trim();
     }
 
-    async function carregarPlaylist() {
-        const inputVal = document.getElementById('playlistInput').value;
-        const playlistId = extrairPlaylistId(inputVal);
+    function carregarPlaylist() {
+        const val = document.getElementById('playlistInput').value;
+        const playlistId = extrairPlaylistId(val);
 
         if (!playlistId) {
-            alert('Por favor, informe uma URL ou ID de playlist válido!');
+            alert('Cole um link ou ID de playlist válido!');
             return;
         }
 
-        statusEl.innerText = "Carregando músicas da playlist...";
-        
-        let sucesso = false;
-        for (const inst of INSTANCIAS) {
-            try {
-                instanciaAtual = inst;
-                const res = await fetch(`${instanciaAtual}/api/v1/playlists/${playlistId}`);
-                if (!res.ok) continue;
-                
-                const data = await res.json();
-                playlistOriginal = data.videos || [];
-                
-                if (playlistOriginal.length > 0) {
-                    sucesso = true;
-                    break;
-                }
-            } catch (e) {
-                console.warn(`Instância ${inst} falhou. Tentando próxima...`);
-            }
-        }
+        player.loadPlaylist({
+            listType: 'playlist',
+            list: playlistId,
+            index: 0
+        });
 
-        if (!sucesso) {
-            statusEl.innerText = "Erro ao carregar playlist. Tente novamente mais tarde.";
-            return;
-        }
-
-        configurarOrdem();
-        renderizarLista();
-        tocarIndice(0);
+        document.getElementById('statusText').innerText = "Carregando músicas...";
+        setTimeout(atualizarListaVisual, 1800);
     }
 
-    function configurarOrdem() {
-        ordemReproducao = playlistOriginal.map((_, i) => i);
-        if (isShuffle) {
-            embaralhar(ordemReproducao);
+    function onPlayerStateChange(event) {
+        const playBtn = document.getElementById('btnPlayPause');
+
+        // Tocando
+        if (event.data === YT.PlayerState.PLAYING) {
+            isPlaying = true;
+            playBtn.innerText = "⏸";
+            atualizarInfoMusica();
+        } 
+        // Pausado
+        else if (event.data === YT.PlayerState.PAUSED) {
+            isPlaying = false;
+            playBtn.innerText = "▶";
+        }
+        // Terminou a música -> O próprio YouTube já passa para a próxima sozinho!
+        else if (event.data === YT.PlayerState.ENDED) {
+            atualizarInfoMusica();
         }
     }
 
-    function embaralhar(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-    }
-
-    function toggleShuffle() {
-        isShuffle = !isShuffle;
-        btnShuffle.classList.toggle('active', isShuffle);
-        btnShuffle.innerText = isShuffle ? "🔀 Aleatório: ON" : "🔀 Aleatório: OFF";
-
-        const videoAtualIdx = ordemReproducao[ponteiro];
-        configurarOrdem();
-        ponteiro = Math.max(0, ordemReproducao.indexOf(videoAtualIdx));
-    }
-
-    function tocarIndice(novoPonteiro) {
-        if (novoPonteiro < 0 || novoPonteiro >= ordemReproducao.length) return;
-        ponteiro = novoPonteiro;
-
-        const videoIndexOriginal = ordemReproducao[ponteiro];
-        const video = playlistOriginal[videoIndexOriginal];
-
-        titleEl.innerText = video.title;
-        statusEl.innerText = `Tocando ${ponteiro + 1} de ${ordemReproducao.length}`;
-
-        // Carrega o player sem anúncios via embed do Invidious
-        player.src = `${instanciaAtual}/embed/${video.videoId}?autoplay=1`;
-
-        atualizarDestaqueLista();
-
-        // Autoplay para a próxima música com base na duração informada pela API
-        if (timerAutoSkip) clearTimeout(timerAutoSkip);
-        if (video.lengthSeconds && video.lengthSeconds > 0) {
-            timerAutoSkip = setTimeout(() => {
-                proximaMusica();
-            }, (video.lengthSeconds + 1) * 1000);
-        }
-    }
-
-    function proximaMusica() {
-        if (ponteiro + 1 < ordemReproducao.length) {
-            tocarIndice(ponteiro + 1);
+    function togglePlayPause() {
+        if (!player) return;
+        if (isPlaying) {
+            player.pauseVideo();
         } else {
-            statusEl.innerText = "Fim da playlist";
+            player.playVideo();
         }
     }
 
-    function anteriorMusica() {
-        if (ponteiro > 0) {
-            tocarIndice(ponteiro - 1);
+    function pular() {
+        if (player && player.nextVideo) player.nextVideo();
+    }
+
+    function voltar() {
+        if (player && player.previousVideo) player.previousVideo();
+    }
+
+    function alternarShuffle() {
+        isShuffle = !isShuffle;
+        const btn = document.getElementById('btnShuffle');
+        btn.classList.toggle('active', isShuffle);
+
+        if (player && player.setShuffle) {
+            player.setShuffle(isShuffle);
         }
     }
 
-    function renderizarLista() {
+    function tocarIndice(idx) {
+        if (player && player.playVideoAt) {
+            player.playVideoAt(idx);
+        }
+    }
+
+    function atualizarListaVisual() {
+        const container = document.getElementById('playlistContainer');
         container.innerHTML = '';
-        playlistOriginal.forEach((v, indexOriginal) => {
+
+        const videoIds = player.getPlaylist();
+        if (!videoIds || videoIds.length === 0) return;
+
+        videoIds.forEach((id, index) => {
             const div = document.createElement('div');
             div.className = 'track-item';
-            div.id = `item-${indexOriginal}`;
-            div.innerText = `${indexOriginal + 1}. ${v.title}`;
-            div.onclick = () => {
-                const idxNaFila = ordemReproducao.indexOf(indexOriginal);
-                tocarIndice(idxNaFila);
-            };
+            div.id = `item-${index}`;
+            div.innerText = `Faixa ${index + 1}`;
+            div.onclick = () => tocarIndice(index);
             container.appendChild(div);
         });
+
+        atualizarInfoMusica();
     }
 
-    function atualizarDestaqueLista() {
+    function atualizarInfoMusica() {
+        if (!player || !player.getPlaylistIndex) return;
+        const idx = player.getPlaylistIndex();
+        const total = player.getPlaylist() ? player.getPlaylist().length : 0;
+
+        const data = player.getVideoData();
+        if (data && data.title) {
+            document.getElementById('currentTitle').innerText = data.title;
+        } else {
+            document.getElementById('currentTitle').innerText = `Faixa ${idx + 1}`;
+        }
+
+        document.getElementById('statusText').innerText = `Música ${idx + 1} de ${total}`;
+
         document.querySelectorAll('.track-item').forEach(el => el.classList.remove('playing'));
-        const indexOriginal = ordemReproducao[ponteiro];
-        const ativo = document.getElementById(`item-${indexOriginal}`);
+        const ativo = document.getElementById(`item-${idx}`);
         if (ativo) {
             ativo.classList.add('playing');
             ativo.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
