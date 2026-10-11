@@ -68,10 +68,11 @@
             margin-bottom: 16px;
         }
 
-        video {
+        iframe {
             width: 100%;
-            max-height: 250px;
+            height: 260px;
             border-radius: 8px;
+            border: none;
             background: #000;
         }
 
@@ -133,7 +134,7 @@
         .status {
             font-size: 12px;
             color: #aaa;
-            margin-top: 4px;
+            margin-top: 8px;
         }
     </style>
 </head>
@@ -146,7 +147,8 @@
     </div>
 
     <div class="player-card">
-        <video id="mediaPlayer" controls playsinline></video>
+        <!-- Iframe do Invidious: sem anúncios e sem bloqueio 403 -->
+        <iframe id="mediaPlayer" allow="autoplay; encrypted-media" allowfullscreen></iframe>
         <div class="track-title" id="currentTitle">Nenhuma música carregada</div>
 
         <div class="controls">
@@ -154,7 +156,7 @@
             <button class="btn-ctrl" onclick="proximaMusica()">Pular ⏭</button>
             <button class="btn-ctrl" id="btnShuffle" onclick="toggleShuffle()">🔀 Aleatório: OFF</button>
         </div>
-        <div class="status" id="statusText">Pronto</div>
+        <div class="status" id="statusText">Cole a playlist e clique em Abrir</div>
     </div>
 
     <div class="playlist-container" id="playlistContainer">
@@ -163,18 +165,19 @@
 </div>
 
 <script>
-    // Instâncias abertas do Invidious (com fallback automático se uma falhar)
+    // Lista de instâncias públicas estáveis
     const INSTANCIAS = [
         "https://inv.nadeko.net",
         "https://invidious.nerdvpn.de",
-        "https://invidious.tiekoetter.com"
+        "https://invidious.jing.rocks"
     ];
     let instanciaAtual = INSTANCIAS[0];
 
     let playlistOriginal = [];
-    let ordemReproducao = []; // Guarda a ordem (normal ou embaralhada)
+    let ordemReproducao = [];
     let ponteiro = 0;
     let isShuffle = false;
+    let timerAutoSkip = null;
 
     const player = document.getElementById('mediaPlayer');
     const titleEl = document.getElementById('currentTitle');
@@ -182,7 +185,6 @@
     const container = document.getElementById('playlistContainer');
     const btnShuffle = document.getElementById('btnShuffle');
 
-    // Extrai o ID da playlist mesmo se o usuário colar o link inteiro
     function extrairPlaylistId(urlOuId) {
         const match = urlOuId.match(/[?&]list=([^#&?]+)/);
         return match ? match[1] : urlOuId.trim();
@@ -197,7 +199,7 @@
             return;
         }
 
-        statusEl.innerText = "Carregando músicas...";
+        statusEl.innerText = "Carregando músicas da playlist...";
         
         let sucesso = false;
         for (const inst of INSTANCIAS) {
@@ -249,7 +251,6 @@
 
         const videoAtualIdx = ordemReproducao[ponteiro];
         configurarOrdem();
-        // Mantém a música atual como ponto de partida da nova ordem
         ponteiro = Math.max(0, ordemReproducao.indexOf(videoAtualIdx));
     }
 
@@ -263,13 +264,18 @@
         titleEl.innerText = video.title;
         statusEl.innerText = `Tocando ${ponteiro + 1} de ${ordemReproducao.length}`;
 
-        // Link direto do stream sem anúncios fornecido pela instância
-        player.src = `${instanciaAtual}/latest_version?id=${video.videoId}&itag=18`;
-        player.play().catch(() => {
-            statusEl.innerText = "Pressione Play para começar";
-        });
+        // Carrega o player sem anúncios via embed do Invidious
+        player.src = `${instanciaAtual}/embed/${video.videoId}?autoplay=1`;
 
         atualizarDestaqueLista();
+
+        // Autoplay para a próxima música com base na duração informada pela API
+        if (timerAutoSkip) clearTimeout(timerAutoSkip);
+        if (video.lengthSeconds && video.lengthSeconds > 0) {
+            timerAutoSkip = setTimeout(() => {
+                proximaMusica();
+            }, (video.lengthSeconds + 1) * 1000);
+        }
     }
 
     function proximaMusica() {
@@ -286,11 +292,6 @@
         }
     }
 
-    // Passa para a próxima música sozinho quando terminar
-    player.onended = () => {
-        proximaMusica();
-    };
-
     function renderizarLista() {
         container.innerHTML = '';
         playlistOriginal.forEach((v, indexOriginal) => {
@@ -299,7 +300,6 @@
             div.id = `item-${indexOriginal}`;
             div.innerText = `${indexOriginal + 1}. ${v.title}`;
             div.onclick = () => {
-                // Ao clicar, localiza onde essa música está na fila atual e toca
                 const idxNaFila = ordemReproducao.indexOf(indexOriginal);
                 tocarIndice(idxNaFila);
             };
